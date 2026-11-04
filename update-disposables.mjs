@@ -1,0 +1,3 @@
+import {writeFile} from 'node:fs/promises';
+const base='https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/main/';
+for(const [source,target] of [['disposable_email_blocklist.conf','disposable-domains.txt'],['LICENSE.txt','disposable-list-LICENSE.txt']]){const res=await fetch(base+source,{signal:AbortSignal.timeout(20000)});if(!res.ok)throw Error('Disposable list download failed: '+res.status);const text=await res.text();if(source.endsWith('.conf')&&(!text.includes('mailinator.com')||text.length<1000))throw Error('Unexpected disposable list response');await writeFile(new URL('./dist/'+target,import.meta.url),text);console.log('Updated '+target);}

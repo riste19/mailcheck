@@ -1,0 +1,10 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {parseCSV,csvCell} from './dist/core.mjs';
+import {RULESET,csvObjects,savedMailbox,diagnostics} from './dist/evidence.mjs';
+const [input,output]=process.argv.slice(2);
+if(!input||!output||resolve(input)===resolve(output))throw Error('Usage: node review-export.mjs input.csv new-output.csv (different files)');
+const original=csvObjects(await readFile(input,'utf8'),parseCSV);if(!original.length||!('recipient_reply' in original[0]))throw Error('A Mailcheck export is required');
+const reviewed_at=new Date().toISOString();const counts={};
+const rows=original.map(r=>{const m=savedMailbox(r);counts[m.status]=(counts[m.status]||0)+1;const labels={accepted:'SMTP accepted','accepted-unconfirmed':'Accepted / catch-all uncertain','catch-all':'Catch-all',rejected:'Invalid / rejected'};return {...r,original_result:r.result,original_mailbox_status:r.mailbox_status,result:r.suppressed==='true'?'Suppressed':r.duplicate==='true'?'Duplicate':r.domain_status==='invalid'?'Invalid / rejected':labels[m.status]||(m.check_failed?'Check failed':r.result),mailbox_status:m.status,recipient_status:m.recipient_status,catchall_status:m.catchall_status,rule:m.rule||'',ruleset:RULESET,evidence:m.reason,diagnostics:diagnostics(m),retryable:m.retryable,check_failed:!!m.check_failed,reviewed_at,evidence_origin:'saved'};});
+const headers=Object.keys(rows[0]);await writeFile(output,'\uFEFF'+[headers,...rows.map(r=>headers.map(k=>r[k]))].map(r=>r.map(csvCell).join(',')).join('\r\n'),{flag:'wx'});console.log(JSON.stringify({rows:rows.length,counts,output,ruleset:RULESET,newProbes:0}));
